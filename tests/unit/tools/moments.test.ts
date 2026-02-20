@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { registerMomentTools } from '../../../src/tools/moments.js';
+import { registerMomentTools, registerMomentWriteTools } from '../../../src/tools/moments.js';
 import { makeMoment, wrapJsonApiList, wrapJsonApiSingle } from '../../fixtures/chorus-responses.js';
 
 jest.mock('axios');
@@ -15,6 +15,7 @@ describe('Moment Tools', () => {
     process.env = { ...originalEnv, CHORUS_API_KEY: 'test-key' };
     server = new McpServer({ name: 'test', version: '1.0.0' });
     registerMomentTools(server);
+    registerMomentWriteTools(server);
   });
 
   afterAll(() => { process.env = originalEnv; });

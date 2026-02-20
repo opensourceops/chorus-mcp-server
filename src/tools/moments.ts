@@ -117,6 +117,9 @@ Returns: Moment with timestamp, title, description, type, and transcript text.`,
     }
   );
 
+}
+
+export function registerMomentWriteTools(server: McpServer): void {
   server.registerTool(
     "chorus_create_moment",
     {
