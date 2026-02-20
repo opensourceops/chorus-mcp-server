@@ -33,11 +33,12 @@ Run `npx` directly through Claude Code. No clone, no build.
 ```bash
 claude mcp add --transport stdio chorus \
   --scope user \
-  --env CHORUS_API_KEY=<YOUR_API_KEY> \
+  -e CHORUS_API_KEY=<YOUR_API_KEY> \
+  -e CHORUS_TOOL_MODE=readonly \
   -- npx -y @opensourceops/chorus-mcp
 ```
 
-Replace `<YOUR_API_KEY>` with your Chorus API token.
+Replace `<YOUR_API_KEY>` with your Chorus API token. Set `CHORUS_TOOL_MODE` to `all` if you need write and delete tools.
 
 ### Step 3: Restart Claude Code
 
@@ -69,7 +70,8 @@ Then configure your MCP client to run `chorus-mcp-server` instead of `npx`:
     "chorus": {
       "command": "chorus-mcp-server",
       "env": {
-        "CHORUS_API_KEY": "your_api_key"
+        "CHORUS_API_KEY": "your_api_key",
+        "CHORUS_TOOL_MODE": "readonly"
       }
     }
   }
@@ -172,6 +174,7 @@ Built-in workflow prompts for common sales intelligence tasks:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `CHORUS_API_KEY` | -- | Chorus API token (required) |
+| `CHORUS_TOOL_MODE` | `readonly` | Tool access level: `readonly` (read-only tools) or `all` (includes write and delete tools) |
 | `TRANSPORT` | `stdio` | Transport mode: `stdio` or `http` |
 | `PORT` | `3000` | HTTP server port (when `TRANSPORT=http`) |
 
@@ -184,7 +187,7 @@ The server supports two transport modes:
 **Streamable HTTP** -- HTTP-based transport for network deployments:
 
 ```bash
-TRANSPORT=http PORT=3000 CHORUS_API_KEY=your_key npx @opensourceops/chorus-mcp
+TRANSPORT=http PORT=3000 CHORUS_API_KEY=your_key CHORUS_TOOL_MODE=readonly npx @opensourceops/chorus-mcp
 ```
 
 ## Local Development
@@ -206,7 +209,8 @@ npm run build
 
 ```bash
 claude mcp add --transport stdio chorus \
-  --env CHORUS_API_KEY=your_api_key \
+  -e CHORUS_API_KEY=your_api_key \
+  -e CHORUS_TOOL_MODE=readonly \
   -- $(which node) $(pwd)/dist/index.js
 ```
 
@@ -221,7 +225,8 @@ Add to your MCP client's config file:
       "command": "node",
       "args": ["/absolute/path/to/chorus-mcp-server/dist/index.js"],
       "env": {
-        "CHORUS_API_KEY": "your_api_key"
+        "CHORUS_API_KEY": "your_api_key",
+        "CHORUS_TOOL_MODE": "readonly"
       }
     }
   }
