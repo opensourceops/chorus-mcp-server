@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerConversationTools } from '../../../src/tools/conversations.js';
-import { makeConversation, makeTranscriptSegments, makeTrackers, wrapJsonApiList, wrapJsonApiSingle } from '../../fixtures/chorus-responses.js';
+import { makeConversation, makeUtterances, makeRealTrackers, wrapJsonApiList, wrapJsonApiSingle } from '../../fixtures/chorus-responses.js';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.MockedFunction<typeof axios>;
@@ -36,7 +36,7 @@ describe('Conversation Tools', () => {
     });
 
     it('returns conversations in markdown format', async () => {
-      const conversations = [makeConversation(), makeConversation({ id: 'conv-002', title: 'Demo Call' })];
+      const conversations = [makeConversation(), makeConversation({ id: 'conv-002', name: 'Demo Call' })];
       mockedAxios.mockResolvedValue({ data: wrapJsonApiList(conversations, 'conversation') });
 
       const tool = getToolHandler('chorus_list_conversations');
@@ -118,12 +118,16 @@ describe('Conversation Tools', () => {
 
   describe('chorus_get_transcript', () => {
     it('returns full transcript', async () => {
-      // Transcript segments use JSON:API format too
-      const segments = makeTranscriptSegments().map((s, i) => ({
-        id: `seg-${i}`,
-        ...s,
-      }));
-      mockedAxios.mockResolvedValue({ data: wrapJsonApiList(segments, 'transcript_segment') });
+      // Transcript is embedded in the conversation response under recording.utterances
+      const conv = makeConversation({
+        recording: {
+          start_time: '2024-06-15T14:00:00Z',
+          duration: 1800,
+          utterances: makeUtterances(),
+          trackers: [],
+        },
+      });
+      mockedAxios.mockResolvedValue({ data: wrapJsonApiSingle(conv, 'conversation') });
 
       const tool = getToolHandler('chorus_get_transcript');
       const result = await tool.handler({ conversation_id: 'conv-001', response_format: 'markdown' }, {} as any);
@@ -134,11 +138,15 @@ describe('Conversation Tools', () => {
     });
 
     it('filters transcript by speaker', async () => {
-      const segments = makeTranscriptSegments().map((s, i) => ({
-        id: `seg-${i}`,
-        ...s,
-      }));
-      mockedAxios.mockResolvedValue({ data: wrapJsonApiList(segments, 'transcript_segment') });
+      const conv = makeConversation({
+        recording: {
+          start_time: '2024-06-15T14:00:00Z',
+          duration: 1800,
+          utterances: makeUtterances(),
+          trackers: [],
+        },
+      });
+      mockedAxios.mockResolvedValue({ data: wrapJsonApiSingle(conv, 'conversation') });
 
       const tool = getToolHandler('chorus_get_transcript');
       const result = await tool.handler({
@@ -152,11 +160,15 @@ describe('Conversation Tools', () => {
     });
 
     it('returns message when no segments match speaker filter', async () => {
-      const segments = makeTranscriptSegments().map((s, i) => ({
-        id: `seg-${i}`,
-        ...s,
-      }));
-      mockedAxios.mockResolvedValue({ data: wrapJsonApiList(segments, 'transcript_segment') });
+      const conv = makeConversation({
+        recording: {
+          start_time: '2024-06-15T14:00:00Z',
+          duration: 1800,
+          utterances: makeUtterances(),
+          trackers: [],
+        },
+      });
+      mockedAxios.mockResolvedValue({ data: wrapJsonApiSingle(conv, 'conversation') });
 
       const tool = getToolHandler('chorus_get_transcript');
       const result = await tool.handler({
@@ -171,8 +183,16 @@ describe('Conversation Tools', () => {
 
   describe('chorus_get_conversation_trackers', () => {
     it('returns tracker data', async () => {
-      const trackers = makeTrackers();
-      mockedAxios.mockResolvedValue({ data: wrapJsonApiList(trackers, 'tracker') });
+      // Trackers are embedded in the conversation response under recording.trackers
+      const conv = makeConversation({
+        recording: {
+          start_time: '2024-06-15T14:00:00Z',
+          duration: 1800,
+          utterances: [],
+          trackers: makeRealTrackers(),
+        },
+      });
+      mockedAxios.mockResolvedValue({ data: wrapJsonApiSingle(conv, 'conversation') });
 
       const tool = getToolHandler('chorus_get_conversation_trackers');
       const result = await tool.handler({ conversation_id: 'conv-001', response_format: 'markdown' }, {} as any);
@@ -182,7 +202,15 @@ describe('Conversation Tools', () => {
     });
 
     it('returns message when no trackers found', async () => {
-      mockedAxios.mockResolvedValue({ data: { data: [], meta: { page: { total: 0 } } } });
+      const conv = makeConversation({
+        recording: {
+          start_time: '2024-06-15T14:00:00Z',
+          duration: 1800,
+          utterances: [],
+          trackers: [],
+        },
+      });
+      mockedAxios.mockResolvedValue({ data: wrapJsonApiSingle(conv, 'conversation') });
 
       const tool = getToolHandler('chorus_get_conversation_trackers');
       const result = await tool.handler({ conversation_id: 'conv-001', response_format: 'markdown' }, {} as any);

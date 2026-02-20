@@ -42,9 +42,8 @@ Returns: Paginated list of teams with name, manager, and member count.`,
           for (const t of teams) {
             const name = (t.name as string) || "Untitled";
             const id = t.id as string;
-            const managerName = t.managerName as string | undefined;
-            const memberCount = t.memberCount as number | undefined;
-            lines.push(`- **${name}** (${id})${managerName ? ` | Manager: ${managerName}` : ""}${memberCount !== undefined ? ` | ${memberCount} members` : ""}`);
+            const users = (t.users || []) as unknown[];
+            lines.push(`- **${name}** (${id}) | ${users.length} members`);
           }
           return lines.join("\n");
         }, params.response_format);
@@ -66,7 +65,7 @@ Args:
   - team_id (string): The team ID
   - response_format ('markdown'|'json'): Output format (default: 'markdown')
 
-Returns: Team details with name, manager, and member list.`,
+Returns: Team details with name, language, and member user IDs.`,
       inputSchema: GetTeamSchema,
       annotations: ANNOTATIONS.READ_ONLY,
     },
@@ -77,19 +76,20 @@ Returns: Team details with name, manager, and member list.`,
         const text = formatOutput(team, () => {
           const name = (team.name as string) || "Untitled";
           const id = team.id as string;
-          const managerName = team.managerName as string | undefined;
-          const memberCount = team.memberCount as number | undefined;
-          const members = team.members as Array<Record<string, unknown>> | undefined;
+          const language = team.language as string | undefined;
+          const isDefault = team.default as boolean | undefined;
+          const includeDescendants = team.include_descendant_teams as boolean | undefined;
+          const users = (team.users || []) as unknown[];
           const lines: string[] = [`# ${name}`, "", `- **ID**: ${id}`];
-          if (managerName) lines.push(`- **Manager**: ${managerName}`);
-          if (memberCount !== undefined) lines.push(`- **Members**: ${memberCount}`);
-          if (members && members.length > 0) {
-            lines.push("", "## Team Members");
-            for (const m of members) {
-              const mName = (m.name as string) || "Unknown";
-              const mEmail = (m.email as string) || "";
-              const mRole = m.role as string | undefined;
-              lines.push(`- **${mName}** (${mEmail})${mRole ? ` [${mRole}]` : ""}`);
+          if (language) lines.push(`- **Language**: ${language}`);
+          if (isDefault !== undefined) lines.push(`- **Default**: ${isDefault ? "Yes" : "No"}`);
+          if (includeDescendants !== undefined) lines.push(`- **Include Descendant Teams**: ${includeDescendants ? "Yes" : "No"}`);
+          lines.push(`- **Members**: ${users.length} user IDs`);
+          if (users.length > 0) {
+            lines.push("", "## Member User IDs");
+            // Users are numeric IDs, not objects
+            for (const uid of users) {
+              lines.push(`- ${uid}`);
             }
           }
           return lines.join("\n");
@@ -106,7 +106,7 @@ Returns: Team details with name, manager, and member list.`,
     "chorus_get_team_members",
     {
       title: "Get Team Members",
-      description: `List members of a specific Chorus team.
+      description: `List members of a specific Chorus team. Returns user IDs from the team record.
 
 Args:
   - team_id (string): The team ID
@@ -114,30 +114,39 @@ Args:
   - offset (number): Pagination offset (default: 0)
   - response_format ('markdown'|'json'): Output format (default: 'markdown')
 
-Returns: Paginated list of team members with profile details.`,
+Returns: Paginated list of team member user IDs.`,
       inputSchema: GetTeamMembersSchema,
       annotations: ANNOTATIONS.READ_ONLY,
     },
     async (params: GetTeamMembersInput) => {
       try {
-        const data = await makeApiRequest<ListResponse>(
-          `teams/${params.team_id}/members`, "GET", undefined, { "page[size]": params.limit }
-        );
-        const members = data.items || [];
-        const response = buildPaginatedResponse(members, data.total || members.length, params.offset);
+        // No separate /teams/{id}/members endpoint; user IDs are in the team response
+        const team = await makeApiRequest<Record<string, unknown>>(`teams/${params.team_id}`);
+        const allUsers = (team.users || []) as unknown[];
+        const teamName = (team.name as string) || "Unknown";
 
-        if (members.length === 0) {
+        // Apply manual pagination over the user ID list
+        const start = params.offset;
+        const end = start + params.limit;
+        const pageUsers = allUsers.slice(start, end);
+
+        const response = buildPaginatedResponse(
+          pageUsers.map((uid) => ({ id: String(uid) })),
+          allUsers.length,
+          params.offset
+        );
+
+        if (allUsers.length === 0) {
           return { content: [{ type: "text" as const, text: "No members found for this team." }] };
         }
 
         const text = formatOutput(response, () => {
-          const lines: string[] = ["# Team Members", "", formatPaginationInfo(response), ""];
-          for (const m of members) {
-            const name = (m.name as string) || "Unknown";
-            const id = m.id as string;
-            const email = (m.email as string) || "";
-            const role = m.role as string | undefined;
-            lines.push(`- **${name}** (${id}) - ${email}${role ? ` [${role}]` : ""}`);
+          const lines: string[] = [
+            `# Team Members: ${teamName}`, "",
+            formatPaginationInfo(response), "",
+          ];
+          for (const uid of pageUsers) {
+            lines.push(`- User ID: ${uid}`);
           }
           return lines.join("\n");
         }, params.response_format);

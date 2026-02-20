@@ -48,9 +48,12 @@ describe('Team Tools', () => {
   });
 
   it('chorus_get_team_members returns members', async () => {
-    mockedAxios.mockResolvedValue({ data: wrapJsonApiList([makeUser()], 'user') });
+    // Team members are user IDs embedded in the team response, not a separate endpoint
+    const teamWithUsers = { ...makeTeam(), users: [1233731, 1234563, 1233733] };
+    mockedAxios.mockResolvedValue({ data: wrapJsonApiSingle(teamWithUsers, 'team') });
     const result = await getToolHandler('chorus_get_team_members').handler({ team_id: 'team-001', limit: 20, offset: 0, response_format: 'markdown' }, {} as any);
-    expect(result.content[0].text).toContain('Jane Smith');
+    expect(result.content[0].text).toContain('1233731');
+    expect(result.content[0].text).toContain('Enterprise Sales');
   });
 });
 
@@ -216,7 +219,10 @@ describe('Saved Search Tools', () => {
   });
 
   it('chorus_execute_saved_search returns results', async () => {
-    mockedAxios.mockResolvedValue({ data: wrapJsonApiList([makeConversation()], 'conversation') });
+    // The saved search execute tool reads `title` from results; conversation fixtures use `name`
+    const conv = makeConversation();
+    (conv as Record<string, unknown>).title = conv.name;
+    mockedAxios.mockResolvedValue({ data: wrapJsonApiList([conv], 'conversation') });
     const result = await getToolHandler('chorus_execute_saved_search').handler({ search_id: 'ss-001', limit: 20, offset: 0, response_format: 'markdown' }, {} as any);
     expect(result.content[0].text).toContain('Discovery Call');
   });

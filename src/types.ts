@@ -2,6 +2,7 @@ export interface ChorusParticipant {
   name: string;
   email?: string;
   role?: string;
+  type?: string;
   speakerId?: string;
 }
 

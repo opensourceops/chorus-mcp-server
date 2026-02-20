@@ -24,6 +24,33 @@ import {
   type SearchConversationsInput,
 } from "../schemas/conversations.js";
 
+/**
+ * Fetch a single conversation and return its flattened attributes.
+ * Many tools need the same conversation blob so this avoids duplication.
+ */
+async function fetchConversation(conversationId: string): Promise<Record<string, unknown>> {
+  return makeApiRequest<Record<string, unknown>>(`conversations/${conversationId}`);
+}
+
+/**
+ * Extract common metadata from a conversation record.
+ * The Chorus API nests date/duration inside `recording`.
+ */
+function extractMeta(c: Record<string, unknown>) {
+  const recording = (c.recording || {}) as Record<string, unknown>;
+  return {
+    name: (c.name as string) || "Untitled Conversation",
+    id: c.id as string,
+    date: (recording.start_time as string) || "",
+    duration: (recording.duration as number) || 0,
+    participants: (c.participants || []) as unknown as ChorusParticipant[],
+    status: c.status as string | undefined,
+    summary: c.summary as string | undefined,
+    actionItems: c.action_items as string[] | undefined,
+    recording,
+  };
+}
+
 export function registerConversationTools(server: McpServer): void {
   server.registerTool(
     "chorus_list_conversations",
@@ -80,19 +107,14 @@ Returns: Paginated list of conversations with title, date, duration, and partici
             lines.push(formatPaginationInfo(response));
             lines.push("");
             for (const c of conversations) {
-              const title = (c.title as string) || "Untitled";
-              const id = c.id as string;
-              const date = c.date as string;
-              const duration = c.duration as number;
-              const participants = (c.participants || []) as unknown as ChorusParticipant[];
-              const status = c.status as string | undefined;
-              lines.push(`## ${title} (${id})`);
-              lines.push(`- **Date**: ${formatDate(date)}`);
-              lines.push(`- **Duration**: ${formatDuration(duration)}`);
+              const meta = extractMeta(c);
+              lines.push(`## ${meta.name} (${meta.id})`);
+              lines.push(`- **Date**: ${formatDate(meta.date)}`);
+              lines.push(`- **Duration**: ${formatDuration(meta.duration)}`);
               lines.push(
-                `- **Participants**: ${formatParticipants(participants)}`
+                `- **Participants**: ${formatParticipants(meta.participants)}`
               );
-              if (status) lines.push(`- **Status**: ${status}`);
+              if (meta.status) lines.push(`- **Status**: ${meta.status}`);
               lines.push("");
             }
             return lines.join("\n");
@@ -125,43 +147,40 @@ Returns: Conversation details with title, date, duration, participants, summary,
     },
     async (params: GetConversationInput) => {
       try {
-        const conversation = await makeApiRequest<Record<string, unknown>>(
-          `conversations/${params.conversation_id}`
-        );
+        const conversation = await fetchConversation(params.conversation_id);
+        const meta = extractMeta(conversation);
 
         const text = formatOutput(
           conversation,
           () => {
-            const title = (conversation.title as string) || "Untitled Conversation";
-            const id = conversation.id as string;
-            const date = conversation.date as string;
-            const duration = conversation.duration as number;
-            const participants = (conversation.participants || []) as unknown as ChorusParticipant[];
-            const type = conversation.type as string | undefined;
-            const status = conversation.status as string | undefined;
-            const summary = conversation.summary as string | undefined;
             const lines: string[] = [
-              `# ${title}`,
+              `# ${meta.name}`,
               "",
-              `- **ID**: ${id}`,
-              `- **Date**: ${formatDate(date)}`,
-              `- **Duration**: ${formatDuration(duration)}`,
-              `- **Participants**: ${formatParticipants(participants)}`,
+              `- **ID**: ${meta.id}`,
+              `- **Date**: ${formatDate(meta.date)}`,
+              `- **Duration**: ${formatDuration(meta.duration)}`,
+              `- **Participants**: ${formatParticipants(meta.participants)}`,
             ];
-            if (type) lines.push(`- **Type**: ${type}`);
-            if (status)
-              lines.push(`- **Status**: ${status}`);
-            if (summary) {
-              lines.push("", "## Summary", summary);
+            if (meta.status)
+              lines.push(`- **Status**: ${meta.status}`);
+            if (meta.summary) {
+              lines.push("", "## Summary", meta.summary);
             }
-            if (participants.length > 0) {
+            if (meta.actionItems && meta.actionItems.length > 0) {
+              lines.push("", "## Action Items");
+              for (const item of meta.actionItems) {
+                lines.push(`- ${item}`);
+              }
+            }
+            if (meta.participants.length > 0) {
               lines.push("", "## Participants");
-              for (const p of participants) {
+              for (const p of meta.participants) {
                 const pName = (p.name as string) || "Unknown";
                 const pEmail = p.email as string | undefined;
                 const pRole = p.role as string | undefined;
+                const pType = p.type as string | undefined;
                 lines.push(
-                  `- **${pName}**${pEmail ? ` (${pEmail})` : ""}${pRole ? ` - ${pRole}` : ""}`
+                  `- **${pName}**${pEmail ? ` (${pEmail})` : ""}${pRole ? ` - ${pRole}` : ""}${pType ? ` [${pType}]` : ""}`
                 );
               }
             }
@@ -196,20 +215,19 @@ Returns: Speaker-attributed transcript with timestamps. If speaker_filter is set
     },
     async (params: GetTranscriptInput) => {
       try {
-        const data = await makeApiRequest<ListResponse>(
-          `conversations/${params.conversation_id}/transcript`
-        );
-
-        let segments = data.items || [];
+        // Transcript data is embedded in the conversation response under recording.utterances
+        const conversation = await fetchConversation(params.conversation_id);
+        const recording = (conversation.recording || {}) as Record<string, unknown>;
+        let utterances = (recording.utterances || []) as Array<Record<string, unknown>>;
 
         if (params.speaker_filter) {
           const filter = params.speaker_filter.toLowerCase();
-          segments = segments.filter((s) =>
-            ((s.speaker as string) || "").toLowerCase().includes(filter)
+          utterances = utterances.filter((u) =>
+            ((u.speaker_name as string) || "").toLowerCase().includes(filter)
           );
         }
 
-        if (segments.length === 0) {
+        if (utterances.length === 0) {
           return {
             content: [
               {
@@ -223,7 +241,7 @@ Returns: Speaker-attributed transcript with timestamps. If speaker_filter is set
         }
 
         const text = formatOutput(
-          { segments },
+          { utterances },
           () => {
             const lines: string[] = ["# Transcript", ""];
             if (params.speaker_filter) {
@@ -232,12 +250,13 @@ Returns: Speaker-attributed transcript with timestamps. If speaker_filter is set
                 ""
               );
             }
-            for (const seg of segments) {
-              const startTime = seg.startTime as number;
-              const speaker = (seg.speaker as string) || "Unknown";
-              const segText = (seg.text as string) || "";
-              const time = formatDuration(Math.floor(startTime / 1000));
-              lines.push(`**[${time}] ${speaker}**: ${segText}`, "");
+            for (const u of utterances) {
+              const snippetTime = u.snippet_time as number;
+              const speaker = (u.speaker_name as string) || "Unknown";
+              const snippet = (u.snippet as string) || "";
+              const speakerType = u.speaker_type as string | undefined;
+              const time = formatDuration(Math.floor(snippetTime));
+              lines.push(`**[${time}] ${speaker}**${speakerType ? ` (${speakerType})` : ""}: ${snippet}`, "");
             }
             return lines.join("\n");
           },
@@ -269,11 +288,10 @@ Returns: List of trackers with name, category, hit count, and occurrences with t
     },
     async (params: GetConversationTrackersInput) => {
       try {
-        const data = await makeApiRequest<ListResponse>(
-          `conversations/${params.conversation_id}/trackers`
-        );
-
-        const trackers = data.items || [];
+        // Tracker data is embedded in the conversation response under recording.trackers
+        const conversation = await fetchConversation(params.conversation_id);
+        const recording = (conversation.recording || {}) as Record<string, unknown>;
+        const trackers = (recording.trackers || []) as Array<Record<string, unknown>>;
 
         if (trackers.length === 0) {
           return {
@@ -292,23 +310,15 @@ Returns: List of trackers with name, category, hit count, and occurrences with t
             const lines: string[] = ["# Conversation Trackers", ""];
             for (const t of trackers) {
               const name = (t.name as string) || "Unknown";
-              const category = t.category as string | undefined;
+              const type = t.type as string | undefined;
               const count = t.count as number;
-              const occurrences = (t.occurrences || []) as Array<Record<string, unknown>>;
+              const mentions = (t.mentions || []) as Array<Record<string, unknown>>;
               lines.push(
-                `## ${name}${category ? ` (${category})` : ""}`
+                `## ${name}${type ? ` (${type})` : ""}`
               );
               lines.push(`- **Occurrences**: ${count}`);
-              if (occurrences.length > 0) {
-                lines.push("- **Instances**:");
-                for (const occ of occurrences) {
-                  const timestamp = occ.timestamp as number;
-                  const occText = (occ.text as string) || "";
-                  const time = formatDuration(
-                    Math.floor(timestamp / 1000)
-                  );
-                  lines.push(`  - [${time}]: "${occText}"`);
-                }
+              if (mentions.length > 0) {
+                lines.push(`- **Mention count**: ${mentions.length}`);
               }
               lines.push("");
             }
@@ -358,7 +368,7 @@ Returns: Paginated list of matching conversations with relevance ranking.`,
           queryParams["filter[participant_email]"] = params.participant_email;
         if (params.tracker_name) queryParams["filter[tracker_name]"] = params.tracker_name;
 
-        const data = await makeApiRequest<ListResponse>("conversations/search", "GET", undefined, queryParams);
+        const data = await makeApiRequest<ListResponse>("conversations", "GET", undefined, queryParams);
 
         const conversations = data.items || [];
         const total = data.total || conversations.length;
@@ -389,16 +399,12 @@ Returns: Paginated list of matching conversations with relevance ranking.`,
             lines.push(formatPaginationInfo(response));
             lines.push("");
             for (const c of conversations) {
-              const title = (c.title as string) || "Untitled";
-              const id = c.id as string;
-              const date = c.date as string;
-              const duration = c.duration as number;
-              const participants = (c.participants || []) as unknown as ChorusParticipant[];
-              lines.push(`## ${title} (${id})`);
-              lines.push(`- **Date**: ${formatDate(date)}`);
-              lines.push(`- **Duration**: ${formatDuration(duration)}`);
+              const meta = extractMeta(c);
+              lines.push(`## ${meta.name} (${meta.id})`);
+              lines.push(`- **Date**: ${formatDate(meta.date)}`);
+              lines.push(`- **Duration**: ${formatDuration(meta.duration)}`);
               lines.push(
-                `- **Participants**: ${formatParticipants(participants)}`
+                `- **Participants**: ${formatParticipants(meta.participants)}`
               );
               lines.push("");
             }

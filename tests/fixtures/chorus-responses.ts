@@ -17,19 +17,23 @@ import type {
   ChorusActivityMetrics,
 } from '../../src/types.js';
 
-export function makeConversation(overrides: Partial<ChorusConversation> = {}): ChorusConversation {
+export function makeConversation(overrides: Partial<ChorusConversation> & Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'conv-001',
-    title: 'Discovery Call with Acme Corp',
-    date: '2024-06-15T14:00:00Z',
-    duration: 1800,
+    name: 'Discovery Call with Acme Corp',
     participants: [
-      { name: 'Jane Smith', email: 'jane@ourco.com', role: 'AE' },
-      { name: 'Bob Johnson', email: 'bob@acme.com', role: 'Buyer' },
+      { name: 'Jane Smith', email: 'jane@ourco.com', role: 'AE', type: 'rep' },
+      { name: 'Bob Johnson', email: 'bob@acme.com', role: 'Buyer', type: 'customer' },
     ],
     status: 'completed',
-    type: 'meeting',
     summary: 'Discussed product fit and pricing. Competitor X mentioned twice.',
+    action_items: ['Follow up on pricing', 'Send case study'],
+    recording: {
+      start_time: '2024-06-15T14:00:00Z',
+      duration: 1800,
+      utterances: [],
+      trackers: [],
+    },
     ...overrides,
   };
 }
@@ -251,6 +255,46 @@ export function makeTranscriptSegments(): ChorusTranscriptSegment[] {
     { speaker: 'Jane Smith', text: 'Let me start by understanding your current challenges.', startTime: 6000, endTime: 10000 },
     { speaker: 'Bob Johnson', text: 'Our biggest pain point is manual reporting.', startTime: 10000, endTime: 14000 },
     { speaker: 'Jane Smith', text: 'How much time does your team spend on that weekly?', startTime: 14000, endTime: 18000 },
+  ];
+}
+
+/**
+ * Build utterances in the real Chorus API format (recording.utterances).
+ */
+export function makeUtterances() {
+  return [
+    { id: 'u0', snippet_time: 0, speaker_name: 'Jane Smith', speaker_type: 'rep', snippet: 'Thanks for joining today, Bob.' },
+    { id: 'u1', snippet_time: 3, speaker_name: 'Bob Johnson', speaker_type: 'customer', snippet: 'Happy to be here. We\'re excited about this.' },
+    { id: 'u2', snippet_time: 6, speaker_name: 'Jane Smith', speaker_type: 'rep', snippet: 'Let me start by understanding your current challenges.' },
+    { id: 'u3', snippet_time: 10, speaker_name: 'Bob Johnson', speaker_type: 'customer', snippet: 'Our biggest pain point is manual reporting.' },
+    { id: 'u4', snippet_time: 14, speaker_name: 'Jane Smith', speaker_type: 'rep', snippet: 'How much time does your team spend on that weekly?' },
+  ];
+}
+
+/**
+ * Build trackers in the real Chorus API format (recording.trackers).
+ */
+export function makeRealTrackers() {
+  return [
+    {
+      id: 'competitor-x',
+      name: 'Competitor X',
+      type: 'competitor',
+      count: 2,
+      mentions: [
+        { offset: 0, utterance: 3 },
+        { offset: 0, utterance: 5 },
+      ],
+    },
+    {
+      id: 'pricing',
+      name: 'Pricing Discussion',
+      type: 'topic',
+      count: 1,
+      mentions: [
+        { offset: 0, utterance: 4 },
+      ],
+    },
   ];
 }
 
