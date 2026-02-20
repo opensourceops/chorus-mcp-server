@@ -1,0 +1,63 @@
+{
+  "name": "@opensourceops/chorus-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Chorus.ai conversation intelligence API",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "chorus-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": "^20.9.0 || ^22.0.0 || ^24.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:unit": "jest --testPathPattern=tests/unit",
+    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:e2e": "jest --testPathPattern=tests/e2e --testTimeout=60000",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "chorus",
+    "zoominfo",
+    "conversation-intelligence",
+    "sales",
+    "sales-coaching",
+    "deal-intelligence"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/opensourceops/chorus-mcp-server.git"
+  },
+  "homepage": "https://github.com/opensourceops/chorus-mcp-server#readme",
+  "bugs": {
+    "url": "https://github.com/opensourceops/chorus-mcp-server/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "axios": "^1.7.9",
+    "express": "^4.21.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.10.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
