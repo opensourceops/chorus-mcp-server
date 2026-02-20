@@ -10,22 +10,24 @@ import { registerUserTools } from "./tools/users.js";
 import { registerTeamTools } from "./tools/teams.js";
 import { registerScorecardTools } from "./tools/scorecards.js";
 import { registerPlaylistTools } from "./tools/playlists.js";
-import { registerMomentTools } from "./tools/moments.js";
+import { registerMomentTools, registerMomentWriteTools } from "./tools/moments.js";
 import { registerEmailTools } from "./tools/emails.js";
 import { registerEngagementTools } from "./tools/engagements.js";
 import { registerReportTools } from "./tools/reports.js";
 import { registerSavedSearchTools } from "./tools/saved-searches.js";
-import { registerVideoConferenceTools } from "./tools/video-conferences.js";
+import { registerVideoConferenceTools, registerVideoConferenceWriteTools } from "./tools/video-conferences.js";
 import { registerIntegrationTools } from "./tools/integrations.js";
 import { registerResources } from "./resources/index.js";
 import { registerPrompts } from "./prompts/index.js";
+
+const toolMode = process.env.CHORUS_TOOL_MODE || "readonly";
 
 const server = new McpServer({
   name: "chorus-mcp-server",
   version: "1.0.0",
 });
 
-// Register all tools
+// Register read-only tools (always)
 registerConversationTools(server);
 registerUserTools(server);
 registerTeamTools(server);
@@ -39,6 +41,12 @@ registerSavedSearchTools(server);
 registerVideoConferenceTools(server);
 registerIntegrationTools(server);
 
+// Register write tools only when mode is "all"
+if (toolMode === "all") {
+  registerMomentWriteTools(server);
+  registerVideoConferenceWriteTools(server);
+}
+
 // Register resources and prompts
 registerResources(server);
 registerPrompts(server);
@@ -46,7 +54,7 @@ registerPrompts(server);
 async function runStdio(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Chorus MCP server running via stdio");
+  console.error(`Chorus MCP server running via stdio (tool mode: ${toolMode})`);
 }
 
 async function runHTTP(): Promise<void> {
@@ -67,7 +75,7 @@ async function runHTTP(): Promise<void> {
 
   const port = parseInt(process.env.PORT || "3000");
   app.listen(port, () => {
-    console.error(`Chorus MCP server running on http://localhost:${port}/mcp`);
+    console.error(`Chorus MCP server running on http://localhost:${port}/mcp (tool mode: ${toolMode})`);
   });
 }
 

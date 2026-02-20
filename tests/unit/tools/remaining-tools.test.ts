@@ -6,7 +6,7 @@ import { registerEmailTools } from '../../../src/tools/emails.js';
 import { registerEngagementTools } from '../../../src/tools/engagements.js';
 import { registerReportTools } from '../../../src/tools/reports.js';
 import { registerSavedSearchTools } from '../../../src/tools/saved-searches.js';
-import { registerVideoConferenceTools } from '../../../src/tools/video-conferences.js';
+import { registerVideoConferenceTools, registerVideoConferenceWriteTools } from '../../../src/tools/video-conferences.js';
 import { registerIntegrationTools } from '../../../src/tools/integrations.js';
 import {
   makeTeam, makeUser, makePlaylist, makeMoment,
@@ -231,6 +231,7 @@ describe('Video Conference Tools', () => {
     process.env = { ...originalEnv, CHORUS_API_KEY: 'test-key' };
     server = new McpServer({ name: 'test', version: '1.0.0' });
     registerVideoConferenceTools(server);
+    registerVideoConferenceWriteTools(server);
   });
 
   afterAll(() => { process.env = originalEnv; });

@@ -103,6 +103,9 @@ Returns: Conference details with title, date, participants, recording URL, and d
     }
   );
 
+}
+
+export function registerVideoConferenceWriteTools(server: McpServer): void {
   server.registerTool(
     "chorus_upload_recording",
     {
