@@ -1,6 +1,6 @@
 {
   "name": "@opensourceops/chorus-mcp",
-  "version": "0.1.0-beta",
+  "version": "0.1.0",
   "description": "MCP server for Chorus.ai conversation intelligence API",
   "type": "module",
   "main": "dist/index.js",
